@@ -1,14 +1,15 @@
 #root {
   display: grid;
-  grid-template-columns: 1fr; /* Only one column for header and footer */
-  grid-template-rows: auto 1fr auto; /* Header, content, footer */
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr auto;
   grid-template-areas:
     "header"
     "body"
-    "footer"; /* Define areas for header, body, and footer */
+    "footer";
   gap: 2rem;
   margin: 0 auto;
   padding: 2rem;
+  width: 100%;
 }
 
 header {
@@ -38,4 +39,14 @@ footer {
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+#chatFocus {
+  outline: solid black 1px;
+  margin: 1em;
+  padding: 1em;
+}
+#message {
+  width: 100%;
+  padding: 0.25em;
+  margin: 1em 0;
 }

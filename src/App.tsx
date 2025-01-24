@@ -1,29 +1,43 @@
 import { useState } from "react";
 import "./App.css";
 
+const FLAGS = {
+  is_failure: 1,
+};
+
 interface ChatResponse {
   id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: Array<{
-    message: {
-      role: string;
-      content: string;
-    };
-    finish_reason: string;
-    index: number;
-  }>;
+  message: string;
+  prompt: string;
+  tokens: {
+    prompt: number;
+    reply: number;
+  };
+  flags: number;
 }
 
 export default function App() {
   const apiKey = import.meta.env.VITE_CHATGPT_API_KEY;
 
-  const [response, setResponse] = useState<string | null>(null);
-  const [responseHistory, setResponseHistory] = useState<ChatResponse[]>([]); // History of full responses
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [inputMessage, setInputMessage] = useState("");
+  const [responseHistory, setResponseHistory] = useState<ChatResponse[]>([]);
 
-  const callChatGPT = async (message: string) => {
+  const callChatGPT = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const timestamp = Date.now().toString();
+
+    const chatResponse: ChatResponse = {
+      id: timestamp,
+      message: "",
+      prompt: inputMessage,
+      tokens: {
+        prompt: 0,
+        reply: 0,
+      },
+      flags: 0,
+    };
+
     try {
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -32,32 +46,32 @@ export default function App() {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: message }],
+          model: "gpt-4o-mini", //@todo make dropdown
+          messages: [{ role: "user", content: inputMessage }],
         }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        setResponse(data.choices[0].message.content);
-
-        setResponseHistory((prevHistory) => [...prevHistory, data]);
-
-        console.log(data);
+        chatResponse.message = data.choices[0].message.content;
+        chatResponse.tokens.prompt = data.usage.prompt_tokens;
+        chatResponse.tokens.reply = data.usage.completion_tokens;
       } else {
-        setErrorMessage(data.error.message);
-        console.error("Error:", data.error.message);
+        chatResponse.message = `Error: ${data.error.message}`;
+        chatResponse.flags |= FLAGS.is_failure;
       }
+
+      setResponseHistory((prevHistory) => [...prevHistory, chatResponse]);
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        setErrorMessage(error.message);
-        console.error("Error:", error.message);
-      } else {
-        setErrorMessage("An unknown error occurred");
-        console.error("Unknown error:", error);
-      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      chatResponse.message = `Error: ${errorMessage}`;
+      chatResponse.flags |= FLAGS.is_failure;
+      setResponseHistory((prevHistory) => [...prevHistory, chatResponse]);
     }
+
+    setInputMessage("");
   };
 
   return (
@@ -67,18 +81,50 @@ export default function App() {
       </header>
 
       <div className="body">
-        <div className="column">col1</div>
         <div className="column">
-          <h3>Chat</h3>
-          <h5>Response:</h5>
-          <div>{response}</div>
-          <button onClick={() => callChatGPT("Write a haiku about pokemon")}>
-            Call API
-          </button>
+          <h3>Threads</h3>
+          <p>@todo</p>
         </div>
         <div className="column">
-          <h3>Inspect</h3>
-          <pre>{JSON.stringify(responseHistory, null, 2)}</pre>
+          <h3>Chat</h3>
+          <div id="chatFocus">
+            <ul>
+              {responseHistory.map((record, index) => (
+                <li key={index}>
+                  <strong>Q: </strong>
+                  {record.prompt}
+                  <br />
+                  <strong>A: </strong>
+                  {record.message} <br />
+                  <small>
+                    <strong>Created: </strong>
+                    {new Date(parseInt(record.id))
+                      .toISOString()
+                      .replace("T", " ")
+                      .substring(0, 19)}{" "}
+                    |<strong> Tokens: </strong>
+                    {record.tokens.prompt} + {record.tokens.reply} |{" "}
+                    <strong> Flags: </strong>
+                    {record.flags & FLAGS.is_failure ? "Failure" : "Success"}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <form onSubmit={callChatGPT}>
+            <textarea
+              id="message"
+              name="message"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              required
+            />
+            <button type="submit">Send</button>
+          </form>
+        </div>
+        <div className="column">
+          <h3>Configure</h3>
+          <p></p>
         </div>
       </div>
 
